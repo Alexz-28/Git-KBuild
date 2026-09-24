@@ -58,6 +58,26 @@ on:
           - 'no'
           - 'yes'
         default: 'no'
+      ENABLE_NTSYNC:
+        description: '[Extra] Enable NT synchronization (NTSYNC)'
+        required: false
+        type: boolean
+        default: true
+      ENABLE_NOMOUNT:
+        description: '[Extra] Enable NoMount support (NOMOUNT)'
+        required: false
+        type: boolean
+        default: false
+      ENABLE_RW_SWAPPINESS:
+        description: '[Extra] Allow modification of swappiness'
+        required: false
+        type: boolean
+        default: false
+      ENABLE_BYPASS_CHARGING:
+        description: '[Extra] Enable bypass charging'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -167,6 +187,34 @@ jobs:
         run: |
           cd kernel_tree
           sed -i -e '/# CONFIG_OPLUS_PORT is not set/c\CONFIG_OPLUS_PORT=y;' arch/arm64/configs/vendor/apollo_defconfig
+
+      - name: Apply Custom Feature Switches
+        run: |
+          cd kernel_tree
+          DEFCONFIG="arch/arm64/configs/vendor/apollo_defconfig"
+          
+          chmod +x ./scripts/config
+
+          # Function to toggle configs and echo the status
+          toggle_config() {
+            local feature=$1
+            local state=$2
+            
+            if [[ "$state" == 'true' ]]; then
+              echo "  [+] Enabling $feature"
+              ./scripts/config --file $DEFCONFIG --enable "$feature"
+            else
+              echo "  [-] Disabling $feature"
+              ./scripts/config --file $DEFCONFIG --disable "$feature"
+            fi
+          }
+
+          echo "==== Applying Extra Features ===="
+          toggle_config "CONFIG_NTSYNC" "${{ github.event.inputs.ENABLE_NTSYNC }}"
+          toggle_config "CONFIG_NOMOUNT" "${{ github.event.inputs.ENABLE_NOMOUNT }}"
+          toggle_config "CONFIG_RW_SWAPPINESS" "${{ github.event.inputs.ENABLE_RW_SWAPPINESS }}"
+          toggle_config "CONFIG_BYPASS_CHARGING" "${{ github.event.inputs.ENABLE_BYPASS_CHARGING }}"
+          echo "================================="
 
       - name: Apply Modifications (if modified build)
         if: matrix.kernel == 2 || matrix.kernel == 4
