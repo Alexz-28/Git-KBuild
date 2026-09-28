@@ -222,7 +222,6 @@ jobs:
           toggle_config "CONFIG_RW_SWAPPINESS" "${{ github.event.inputs.ENABLE_RW_SWAPPINESS }}"
           toggle_config "CONFIG_BYPASS_CHARGING" "${{ github.event.inputs.ENABLE_BYPASS_CHARGING }}"
           echo "================================="
-
       - name: Apply Modifications (if modified build)
         if: matrix.kernel == 2 || matrix.kernel == 4
         run: |
@@ -234,7 +233,25 @@ jobs:
           sed -i -e '/<3187200>;/c\//<3187200>;' arch/arm64/boot/dts/vendor/qcom/kona.dtsi
           sed -i -e 's/qcom,mdss-pan-physical-width-dimension = <70>;/qcom,mdss-pan-physical-width-dimension = <695>;/' arch/arm64/boot/dts/vendor/qcom/dsi-panel-k11a-38-08-0a-dsc-cmd.dtsi
           sed -i -e 's/qcom,mdss-pan-physical-height-dimension = <155>;/qcom,mdss-pan-physical-height-dimension = <1546>;/' arch/arm64/boot/dts/vendor/qcom/dsi-panel-k11a-38-08-0a-dsc-cmd.dtsi
-      
+            - name: Force Always Permissive SELinux
+        run: |
+          cd kernel_tree
+          DEFCONFIG="arch/arm64/configs/vendor/alioth_defconfig"
+          
+          echo "==== Forcing Permissive SELinux ===="
+          # Turn off hardcoded enforcing flags
+          sed -i '/CONFIG_ALWAYS_ENFORCE/d' $DEFCONFIG
+          sed -i '/CONFIG_SECURITY_SELINUX_DEVELOP/d' $DEFCONFIG
+          
+          # Inject permissive settings
+          echo "# CONFIG_ALWAYS_ENFORCE is not set" >> $DEFCONFIG
+          echo "CONFIG_SECURITY_SELINUX_DEVELOP=y" >> $DEFCONFIG
+          echo "CONFIG_SELINUX_BOOTPARAM=y" >> $DEFCONFIG
+          
+          # Allow kernel cmdline override
+          ./scripts/config --file $DEFCONFIG --enable CONFIG_SELINUX_BOOTPARAM
+          ./scripts/config --file $DEFCONFIG --disable CONFIG_ALWAYS_ENFORCE
+          echo "===================================="
       - name: Build Kernel
         run: |
           export PATH="$(pwd)/clang/bin:$PATH"
